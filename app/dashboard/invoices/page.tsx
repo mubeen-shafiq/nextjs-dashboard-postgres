@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { Metadata } from 'next';
 import { lusitana } from '@/app/ui/fonts';
 import Pagination from '@/app/ui/invoices/pagination';
 import Search from '@/app/ui/search';
@@ -6,12 +7,18 @@ import Table from '@/app/ui/invoices/table';
 import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
 import { CreateInvoice } from '@/app/ui/invoices/buttons';
 import { fetchInvoicesPages } from '@/app/lib/data';
+
 type PropsTypes = {
   searchParams?: {
     query?: string;
     page?: string;
   };
 };
+
+export const metadata: Metadata = {
+  title: 'Invoices'
+};
+
 export default async function Invoices({ searchParams }: PropsTypes) {
   const query = searchParams?.query || '';
   const currentPage = Number(searchParams?.page) || 1;
