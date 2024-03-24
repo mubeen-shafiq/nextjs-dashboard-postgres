@@ -3,6 +3,14 @@ import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
+import fs from 'fs/promises';
+
+export async function saveFile(file: File, url: string) {
+  const data = await file.arrayBuffer();
+  await fs.writeFile(`./public${url}`, Buffer.from(data));
+}
 
 const invoiceFormSchema = z.object({
   id: z.string(),
@@ -169,11 +177,23 @@ export async function createCustomer(
   }
 
   const { email, name, image_url } = validationResults.data;
+  const updatedUrl = `/customers/${Date.now()}-${image_url.replaceAll(' ', '_')}`;
 
   try {
-    await sql`INSERT INTO customers (name, email, image_url) VALUES (${name}, ${email}, ${'/customers/' + image_url})`;
+    const result =
+      await sql`SELECT COUNT(*) FROM customers where customers.email = ${email}`;
 
-    await saveFile(image);
+    if (Number(result.rows[0].count) != 0)
+      return {
+        errors: {
+          email: ['Email already exist'],
+        },
+        message: 'Invalid Fields!',
+      };
+
+    await sql`INSERT INTO customers (name, email, image_url) VALUES (${name}, ${email}, ${updatedUrl})`;
+
+    await saveFile(image, updatedUrl);
   } catch (error) {
     console.log(error);
     return {
@@ -187,17 +207,25 @@ export async function createCustomer(
 
 export async function deleteCustomer(id: string) {
   try {
+    const result =
+      await sql`SELECT customers.image_url FROM customers WHERE customers.id = ${id}`;
+
+    if (result.rowCount === 0)
+      return {
+        message: 'Customer not found!',
+      };
+
+    const { image_url } = result.rows[0];
+    await fs.unlink(`./public${image_url}`);
+
     await sql`DELETE FROM customers WHERE id = ${id}`;
   } catch (error) {
     return {
       message: 'Database Error: Unable to delete customer.',
     };
   }
+  revalidatePath('/dashboard/customers');
 }
-
-import { signIn } from '@/auth';
-import { AuthError } from 'next-auth';
-import { saveFile } from './utils';
 
 // ...
 

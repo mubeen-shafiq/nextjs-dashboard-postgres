@@ -1,5 +1,4 @@
 import { Revenue } from './definitions';
-import fs from 'fs';
 
 export const formatCurrency = (amount: number) => {
   return (amount / 100).toLocaleString('en-US', {
@@ -68,11 +67,3 @@ export const generatePagination = (currentPage: number, totalPages: number) => {
     totalPages,
   ];
 };
-
-export async function saveFile(file: File) {
-  const data = await file.arrayBuffer();
-  fs.appendFileSync(
-    `./public/${file.lastModified.toString()}-${file.name}.pdf`,
-    Buffer.from(data),
-  );
-}
