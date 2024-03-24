@@ -18,7 +18,7 @@ const invoiceFormSchema = z.object({
   date: z.string(),
 });
 
-export type State = {
+export type InvoiceState = {
   errors?: {
     customerId?: string[];
     amount?: string[];
@@ -27,7 +27,10 @@ export type State = {
   message?: string | null;
 };
 const CreateInvoice = invoiceFormSchema.omit({ id: true, date: true });
-export async function createInvoice(prevState: State, formData: FormData) {
+export async function createInvoice(
+  prevState: InvoiceState,
+  formData: FormData,
+) {
   // better way
   // const rawFormData = Object.fromEntries(formData.entries())
   // course way
@@ -73,7 +76,7 @@ export async function createInvoice(prevState: State, formData: FormData) {
 const UpdateInvoice = invoiceFormSchema.omit({ date: true });
 export async function updateInvoice(
   invoiceId: string,
-  prevState: State,
+  prevState: InvoiceState,
   formData: FormData,
 ) {
   const validatedFields = UpdateInvoice.safeParse({
@@ -119,11 +122,85 @@ export async function deleteInvoice(id: string) {
   revalidatePath('/dashboard/invoices');
 }
 
+// customers actions
+
+type CustomerState = {
+  errors?: {
+    name?: string[];
+    email?: string[];
+    image_url: string[];
+  };
+  message?: string | null;
+};
+
+const customerSchema = z.object({
+  id: z.string(),
+  name: z
+    .string({
+      invalid_type_error: 'Name must be a string',
+    })
+    .min(1, 'Please enter name!'),
+  email: z.string().email({
+    message: 'Please enter a valid email!',
+  }),
+  image_url: z.string({
+    invalid_type_error: 'Please select a image!',
+  }),
+});
+
+const CreateCustomer = customerSchema.omit({ id: true });
+
+export async function createCustomer(
+  prevState: CustomerState,
+  formData: FormData,
+) {
+  const image = formData.get('image_url') as File;
+  const validationResults = CreateCustomer.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    image_url: image.name,
+  });
+
+  if (!validationResults.success) {
+    return {
+      errors: validationResults.error.flatten().fieldErrors,
+      message: 'Missing fields. Failed to create customer',
+    };
+  }
+
+  const { email, name, image_url } = validationResults.data;
+
+  try {
+    await sql`INSERT INTO customers (name, email, image_url) VALUES (${name}, ${email}, ${'/customers/' + image_url})`;
+
+    await saveFile(image);
+  } catch (error) {
+    console.log(error);
+    return {
+      message: 'Database Error. Unable to create customer',
+    };
+  }
+
+  revalidatePath('/dashboard/customers');
+  redirect('/dashboard/customers');
+}
+
+export async function deleteCustomer(id: string) {
+  try {
+    await sql`DELETE FROM customers WHERE id = ${id}`;
+  } catch (error) {
+    return {
+      message: 'Database Error: Unable to delete customer.',
+    };
+  }
+}
+
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
- 
+import { saveFile } from './utils';
+
 // ...
- 
+
 export async function authenticate(
   prevState: string | undefined,
   formData: FormData,
